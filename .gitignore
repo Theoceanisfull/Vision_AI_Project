@@ -1,0 +1,5 @@
+# Dataset files and downloaded archives
+data/
+
+# Notebook checkpoints
+**/.ipynb_checkpoints/
