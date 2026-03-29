@@ -1,0 +1,68 @@
+{
+  "data": {
+    "data_root": "data/ASLDVS",
+    "encoding": "delta",
+    "sensor_size": [
+      180,
+      240
+    ],
+    "num_steps": 20,
+    "batch_size": 32,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "seed": 42,
+    "delta_threshold": 0.1,
+    "num_workers": 0,
+    "pin_memory": false
+  },
+  "model": {
+    "architecture": "base",
+    "input_channels": 2,
+    "num_classes": 24,
+    "conv_channels": [
+      32,
+      64
+    ],
+    "deep_conv_channels": [
+      32,
+      64,
+      128
+    ],
+    "kernel_size": 3,
+    "pool_kernel": 2,
+    "hidden_size": 256,
+    "beta": 0.9,
+    "threshold": 1.0,
+    "surrogate": "fast_sigmoid",
+    "surrogate_kwargs": {
+      "slope": 25.0
+    },
+    "dropout": 0.2
+  },
+  "train": {
+    "mode": "manual",
+    "epochs": 5,
+    "lr": 0.001,
+    "weight_decay": 1e-05,
+    "optimizer": "adam",
+    "loss": "ce_rate_loss",
+    "loss_kwargs": {},
+    "regularizer": "none",
+    "regularizer_kwargs": {},
+    "regularizer_weight": 0.0001,
+    "accuracy_fn": "accuracy_rate",
+    "tbptt_k": 5,
+    "grad_clip": 1.0,
+    "max_train_batches": null,
+    "max_val_batches": null,
+    "max_test_batches": null,
+    "log_every": 25,
+    "device": "auto"
+  },
+  "result": {
+    "out_dir": "runs/scnn",
+    "run_name": "base_delta",
+    "save_plots": true,
+    "save_checkpoint": true
+  }
+}

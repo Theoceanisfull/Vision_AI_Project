@@ -25,8 +25,17 @@ Because of that, teammates should use the setup script instead of only clicking 
 ## Teammate Setup
 
 1. Clone this repository.
-2. Download `ICCV2019_DVS_dataset.zip` from SharePoint to any local folder.
+2. Download `ICCV2019_DVS_dataset.zip` from SharePoint to any local folder, or use the script to download it directly from OpenI.
 3. Run the setup script from the repo root.
+
+If downloading directly with the script, install the OpenI client first:
+
+```bash
+python -m pip install --user openi
+python scripts/setup_asldvs_for_tonic.py
+```
+
+This will download `ICCV2019_DVS_dataset.zip` and extract it under `data/ASLDVS`.
 
 Example:
 
