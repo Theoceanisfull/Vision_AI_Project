@@ -1,0 +1,8 @@
+bundle_label,label,encoding,test_acc,test_loss,train_time_hours,train_time_label,metrics_path
+SCNN base,SCNN base rate,rate,0.390196,2.767381,4.025447836666666,4h 1m 32s,/home/z4j/Neuromorphic_Vision/Vision_AI_Project/runs/scnn/base_rate/metrics.txt
+SCNN deep,SCNN deep rate,rate,0.536469,2.732912,7.786905517222222,7h 47m 13s,/home/z4j/Neuromorphic_Vision/Vision_AI_Project/runs/scnn/deep_rate/metrics.txt
+SCNN x2 base,SCNN x2 base rate,rate,0.680299,2.508408,9.676172115555556,9h 40m 34s,/home/z4j/Neuromorphic_Vision/Vision_AI_Project/runs/scnn_x2_epochs/base_rate/metrics.txt
+SCNN x2 deep,SCNN x2 deep rate,rate,0.791755,2.446172,22.423111214722223,22h 25m 23s,/home/z4j/Neuromorphic_Vision/Vision_AI_Project/runs/scnn_x2_epochs/deep_rate/metrics.txt
+Event2Vec 5e,Event2Vec 5e rate,rate,0.749736,0.797877,0.10871888,6m 31s,/home/z4j/Neuromorphic_Vision/Vision_AI_Project/runs/event2vec/rate/metrics.txt
+Event2Vec 10e,Event2Vec 10e rate,rate,0.833576,0.521762,0.21396389305555555,12m 50s,/home/z4j/Neuromorphic_Vision/Vision_AI_Project/runs/event2vec_10_epochs/rate/metrics.txt
+Event2Vec 50e,Event2Vec 50e latency,latency,0.955735,0.15892,0.9009946038888889,54m 4s,/home/z4j/Neuromorphic_Vision/Vision_AI_Project/runs/event2vec_50_epochs/latency/metrics.txt

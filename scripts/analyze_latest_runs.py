@@ -121,85 +121,260 @@ def load_summary_encoding(summary_path: Path, encoding: str) -> dict[str, Any]:
     raise KeyError(f"Encoding {encoding!r} not found in {summary_path}")
 
 
-def load_rate_progression() -> list[dict[str, Any]]:
-    event2vec_5 = load_summary_encoding(
-        RUNS_DIR / "event2vec" / "encoding_comparison" / "summary.json",
-        "rate",
-    )
-    event2vec_50 = load_summary_encoding(
-        RUNS_DIR / "event2vec_50_epochs" / "encoding_comparison" / "summary.json",
-        "rate",
-    )
-    scnn_base = load_summary_encoding(
-        RUNS_DIR / "scnn" / "base_encoding_comparison" / "summary.json",
-        "rate",
-    )
-    scnn_deep = load_summary_encoding(
-        RUNS_DIR / "scnn" / "deep_encoding_comparison" / "summary.json",
-        "rate",
-    )
-    event2vec_10 = load_metrics_txt(RUNS_DIR / "event2vec_10_epochs" / "rate" / "metrics.txt")
-    scnn_x2_base = load_metrics_txt(RUNS_DIR / "scnn_x2_epochs" / "base_rate" / "metrics.txt")
-    scnn_x2_deep = load_metrics_txt(RUNS_DIR / "scnn_x2_epochs" / "deep_rate" / "metrics.txt")
+def load_progression_entry(
+    *,
+    label: str,
+    family: str,
+    epochs: Any,
+    encoding: str,
+    summary_path: Path | None = None,
+    metrics_path: Path | None = None,
+) -> dict[str, Any] | None:
+    if summary_path is not None and summary_path.exists():
+        data = load_summary_encoding(summary_path, encoding)
+        return {
+            "label": label,
+            "family": family,
+            "epochs": epochs,
+            "encoding": encoding,
+            "test_acc": float(data["test_acc"]),
+            "test_loss": float(data["test_loss"]),
+            "test_spike_count": float(data["test_spike_count"]),
+        }
 
-    return [
+    if metrics_path is not None and metrics_path.exists():
+        data = load_metrics_txt(metrics_path)
+        return {
+            "label": label,
+            "family": family,
+            "epochs": epochs,
+            "encoding": encoding,
+            "test_acc": float(data["test_acc"]),
+            "test_loss": float(data["test_loss"]),
+            "test_spike_count": float(data["test_spike_count"]),
+        }
+
+    return None
+
+
+def load_encoding_progression(encoding: str) -> list[dict[str, Any]]:
+    candidates = [
         {
             "label": "SCNN base",
             "family": "SCNN",
             "epochs": "baseline",
-            "test_acc": scnn_base["test_acc"],
-            "test_loss": scnn_base["test_loss"],
-            "test_spike_count": scnn_base["test_spike_count"],
+            "summary_path": RUNS_DIR / "scnn" / "base_encoding_comparison" / "summary.json",
         },
         {
             "label": "SCNN deep",
             "family": "SCNN",
             "epochs": "baseline",
-            "test_acc": scnn_deep["test_acc"],
-            "test_loss": scnn_deep["test_loss"],
-            "test_spike_count": scnn_deep["test_spike_count"],
+            "summary_path": RUNS_DIR / "scnn" / "deep_encoding_comparison" / "summary.json",
         },
         {
             "label": "SCNN x2 base",
             "family": "SCNN",
             "epochs": "x2",
-            "test_acc": float(scnn_x2_base["test_acc"]),
-            "test_loss": float(scnn_x2_base["test_loss"]),
-            "test_spike_count": float(scnn_x2_base["test_spike_count"]),
+            "metrics_path": RUNS_DIR / "scnn_x2_epochs" / f"base_{encoding}" / "metrics.txt",
         },
         {
             "label": "SCNN x2 deep",
             "family": "SCNN",
             "epochs": "x2",
-            "test_acc": float(scnn_x2_deep["test_acc"]),
-            "test_loss": float(scnn_x2_deep["test_loss"]),
-            "test_spike_count": float(scnn_x2_deep["test_spike_count"]),
+            "metrics_path": RUNS_DIR / "scnn_x2_epochs" / f"deep_{encoding}" / "metrics.txt",
         },
         {
             "label": "Event2Vec 5e",
             "family": "Event2Vec",
             "epochs": 5,
-            "test_acc": event2vec_5["test_acc"],
-            "test_loss": event2vec_5["test_loss"],
-            "test_spike_count": event2vec_5["test_spike_count"],
+            "summary_path": RUNS_DIR / "event2vec" / "encoding_comparison" / "summary.json",
         },
         {
             "label": "Event2Vec 10e",
             "family": "Event2Vec",
             "epochs": 10,
-            "test_acc": float(event2vec_10["test_acc"]),
-            "test_loss": float(event2vec_10["test_loss"]),
-            "test_spike_count": float(event2vec_10["test_spike_count"]),
+            "metrics_path": RUNS_DIR / "event2vec_10_epochs" / encoding / "metrics.txt",
         },
         {
             "label": "Event2Vec 50e",
             "family": "Event2Vec",
             "epochs": 50,
-            "test_acc": event2vec_50["test_acc"],
-            "test_loss": event2vec_50["test_loss"],
-            "test_spike_count": event2vec_50["test_spike_count"],
+            "summary_path": RUNS_DIR / "event2vec_50_epochs" / "encoding_comparison" / "summary.json",
         },
     ]
+
+    rows: list[dict[str, Any]] = []
+    for candidate in candidates:
+        row = load_progression_entry(
+            label=candidate["label"],
+            family=candidate["family"],
+            epochs=candidate["epochs"],
+            encoding=encoding,
+            summary_path=candidate.get("summary_path"),
+            metrics_path=candidate.get("metrics_path"),
+        )
+        if row is not None:
+            rows.append(row)
+    return rows
+
+
+def parse_launch_timestamp(path: Path) -> datetime:
+    match = re.search(r"_(\d{8})_(\d{6})\.log$", path.name)
+    if not match:
+        raise ValueError(f"Could not parse launch timestamp from {path}")
+    return datetime.strptime("".join(match.groups()), "%Y%m%d%H%M%S")
+
+
+def format_duration_hours(hours: float) -> str:
+    total_seconds = int(round(hours * 3600))
+    hours_part, remainder = divmod(total_seconds, 3600)
+    minutes_part, seconds_part = divmod(remainder, 60)
+    if hours_part:
+        return f"{hours_part}h {minutes_part}m {seconds_part}s"
+    return f"{minutes_part}m {seconds_part}s"
+
+
+def load_best_models_training_time() -> list[dict[str, Any]]:
+    bundles = [
+        {
+            "bundle_label": "SCNN base",
+            "launch_log": RUNS_DIR / "scnn" / "launch" / "train_three_base_20260329_175707.log",
+            "runs": [
+                {
+                    "encoding": "rate",
+                    "metrics_path": RUNS_DIR / "scnn" / "base_rate" / "metrics.txt",
+                },
+                {
+                    "encoding": "latency",
+                    "metrics_path": RUNS_DIR / "scnn" / "base_latency" / "metrics.txt",
+                },
+                {
+                    "encoding": "delta",
+                    "metrics_path": RUNS_DIR / "scnn" / "base_delta" / "metrics.txt",
+                },
+            ],
+        },
+        {
+            "bundle_label": "SCNN deep",
+            "launch_log": RUNS_DIR / "scnn" / "launch" / "train_three_deep_20260330_122930.log",
+            "runs": [
+                {
+                    "encoding": "rate",
+                    "metrics_path": RUNS_DIR / "scnn" / "deep_rate" / "metrics.txt",
+                },
+                {
+                    "encoding": "latency",
+                    "metrics_path": RUNS_DIR / "scnn" / "deep_latency" / "metrics.txt",
+                },
+                {
+                    "encoding": "delta",
+                    "metrics_path": RUNS_DIR / "scnn" / "deep_delta" / "metrics.txt",
+                },
+            ],
+        },
+        {
+            "bundle_label": "SCNN x2 base",
+            "launch_log": RUNS_DIR / "scnn" / "launch" / "train_three_base_20260331_103551.log",
+            "runs": [
+                {
+                    "encoding": "rate",
+                    "metrics_path": RUNS_DIR / "scnn_x2_epochs" / "base_rate" / "metrics.txt",
+                },
+            ],
+        },
+        {
+            "bundle_label": "SCNN x2 deep",
+            "launch_log": RUNS_DIR / "scnn" / "launch" / "train_three_deep_20260331_103651.log",
+            "runs": [
+                {
+                    "encoding": "rate",
+                    "metrics_path": RUNS_DIR / "scnn_x2_epochs" / "deep_rate" / "metrics.txt",
+                },
+            ],
+        },
+        {
+            "bundle_label": "Event2Vec 5e",
+            "launch_log": RUNS_DIR / "event2vec" / "launch" / "train_three_20260402_221607.log",
+            "runs": [
+                {
+                    "encoding": "rate",
+                    "metrics_path": RUNS_DIR / "event2vec" / "rate" / "metrics.txt",
+                },
+                {
+                    "encoding": "latency",
+                    "metrics_path": RUNS_DIR / "event2vec" / "latency" / "metrics.txt",
+                },
+                {
+                    "encoding": "delta",
+                    "metrics_path": RUNS_DIR / "event2vec" / "delta" / "metrics.txt",
+                },
+            ],
+        },
+        {
+            "bundle_label": "Event2Vec 10e",
+            "launch_log": RUNS_DIR / "event2vec" / "launch" / "train_three_20260402_223707.log",
+            "runs": [
+                {
+                    "encoding": "rate",
+                    "metrics_path": RUNS_DIR / "event2vec_10_epochs" / "rate" / "metrics.txt",
+                },
+            ],
+        },
+        {
+            "bundle_label": "Event2Vec 50e",
+            "launch_log": RUNS_DIR / "event2vec" / "launch" / "train_three_20260402_225023.log",
+            "runs": [
+                {
+                    "encoding": "rate",
+                    "metrics_path": RUNS_DIR / "event2vec_50_epochs" / "rate" / "metrics.txt",
+                },
+                {
+                    "encoding": "latency",
+                    "metrics_path": RUNS_DIR / "event2vec_50_epochs" / "latency" / "metrics.txt",
+                },
+                {
+                    "encoding": "delta",
+                    "metrics_path": RUNS_DIR / "event2vec_50_epochs" / "delta" / "metrics.txt",
+                },
+            ],
+        },
+    ]
+
+    rows: list[dict[str, Any]] = []
+    for bundle in bundles:
+        current_start = parse_launch_timestamp(bundle["launch_log"])
+        completed_runs: list[dict[str, Any]] = []
+
+        for run in bundle["runs"]:
+            metrics_path = run["metrics_path"]
+            if not metrics_path.exists():
+                continue
+
+            metrics = load_metrics_txt(metrics_path)
+            end_time = datetime.fromtimestamp(metrics_path.stat().st_mtime)
+            duration_hours = (end_time - current_start).total_seconds() / 3600.0
+            completed_runs.append(
+                {
+                    "bundle_label": bundle["bundle_label"],
+                    "encoding": run["encoding"],
+                    "test_acc": float(metrics["test_acc"]),
+                    "test_loss": float(metrics["test_loss"]),
+                    "train_time_hours": duration_hours,
+                    "train_time_label": format_duration_hours(duration_hours),
+                    "metrics_path": str(metrics_path),
+                }
+            )
+            current_start = end_time
+
+        if not completed_runs:
+            continue
+
+        best_run = max(completed_runs, key=lambda row: row["test_acc"])
+        best_run = dict(best_run)
+        best_run["label"] = f"{best_run['bundle_label']} {best_run['encoding']}"
+        rows.append(best_run)
+
+    return rows
 
 
 def process_alive(pid: int) -> bool:
@@ -423,6 +598,74 @@ def save_rate_progression_chart(rows: list[dict[str, Any]], output_path: Path) -
     plt.close(fig)
 
 
+def save_encoding_progression_chart(rows: list[dict[str, Any]], encoding: str, output_path: Path) -> None:
+    labels = [row["label"] for row in rows]
+    x = np.arange(len(labels))
+    colors = [SERIES_COLORS.get(row["label"], ENCODING_COLORS[encoding]) for row in rows]
+
+    title_prefix = "Delta-Modulation" if encoding == "delta" else f"{encoding.title()}-Encoding"
+
+    fig, axes = plt.subplots(2, 1, figsize=(11, 8), sharex=True)
+    fig.patch.set_facecolor("#FAF7F2")
+
+    acc_values = [to_percent(row["test_acc"]) for row in rows]
+    loss_values = [row["test_loss"] for row in rows]
+
+    axes[0].bar(x, acc_values, color=colors, edgecolor="#1F2937")
+    axes[0].set_ylabel("Accuracy (%)")
+    axes[0].set_title(f"{title_prefix} Progression Across Model Families")
+    axes[0].grid(axis="y", alpha=0.25)
+    annotate_bars(axes[0], acc_values, suffix="%")
+
+    axes[1].bar(x, loss_values, color=colors, edgecolor="#1F2937")
+    axes[1].set_ylabel("Test Loss")
+    axes[1].set_xticks(x, labels, rotation=25, ha="right")
+    axes[1].grid(axis="y", alpha=0.25)
+    annotate_bars(axes[1], loss_values, decimals=3)
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_best_models_training_time_chart(rows: list[dict[str, Any]], output_path: Path) -> None:
+    ordered = sorted(rows, key=lambda row: row["train_time_hours"])
+    labels = [row["label"] for row in ordered]
+    y = np.arange(len(labels))
+    colors = [ENCODING_COLORS[row["encoding"]] for row in ordered]
+    values = [row["train_time_hours"] for row in ordered]
+
+    fig, ax = plt.subplots(figsize=(11.5, 6.2))
+    fig.patch.set_facecolor("#FAF7F2")
+    bars = ax.barh(y, values, color=colors, edgecolor="#1F2937")
+    ax.set_yticks(y, labels)
+    ax.set_xlabel("Training Time (hours)")
+    ax.set_title("Best Model From Each Training Bundle: Time to Train", fontsize=15, fontweight="bold")
+    ax.grid(axis="x", alpha=0.25)
+    ax.set_axisbelow(True)
+
+    for bar, row in zip(bars, ordered):
+        ax.text(
+            bar.get_width(),
+            bar.get_y() + bar.get_height() / 2,
+            f" {row['train_time_label']} | {to_percent(row['test_acc']):.2f}% acc",
+            va="center",
+            ha="left",
+            fontsize=9,
+        )
+
+    legend_handles = [
+        plt.Rectangle((0, 0), 1, 1, color=ENCODING_COLORS["rate"], ec="#1F2937"),
+        plt.Rectangle((0, 0), 1, 1, color=ENCODING_COLORS["latency"], ec="#1F2937"),
+        plt.Rectangle((0, 0), 1, 1, color=ENCODING_COLORS["delta"], ec="#1F2937"),
+    ]
+    ax.legend(legend_handles, ["rate", "latency", "delta"], title="Best encoding", frameon=False, loc="lower right")
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def save_live_latency_chart(rows: list[dict[str, Any]], output_path: Path) -> None:
     if not rows:
         return
@@ -467,6 +710,9 @@ def save_live_latency_chart(rows: list[dict[str, Any]], output_path: Path) -> No
 def build_report(
     event2vec_rows: list[dict[str, Any]],
     rate_progression: list[dict[str, Any]],
+    latency_progression: list[dict[str, Any]],
+    delta_progression: list[dict[str, Any]],
+    best_models_training_time: list[dict[str, Any]],
     live_latency_rows: list[dict[str, Any]],
     output_path: Path,
 ) -> None:
@@ -532,6 +778,63 @@ def build_report(
     lines.extend(
         [
             "",
+            "## Latency-Encoding Progression",
+            "",
+            "| Run | Test Acc | Test Loss | Spike Count |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
+
+    for row in latency_progression:
+        lines.append(
+            "| "
+            f"{row['label']} | "
+            f"{to_percent(row['test_acc']):.2f}% | "
+            f"{row['test_loss']:.4f} | "
+            f"{row['test_spike_count']:.2f} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Delta-Modulation Progression",
+            "",
+            "| Run | Test Acc | Test Loss | Spike Count |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
+
+    for row in delta_progression:
+        lines.append(
+            "| "
+            f"{row['label']} | "
+            f"{to_percent(row['test_acc']):.2f}% | "
+            f"{row['test_loss']:.4f} | "
+            f"{row['test_spike_count']:.2f} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Best Model Per Training Bundle: Time to Train",
+            "",
+            "| Best Model | Test Acc | Test Loss | Train Time |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
+
+    for row in sorted(best_models_training_time, key=lambda item: item["train_time_hours"]):
+        lines.append(
+            "| "
+            f"{row['label']} | "
+            f"{to_percent(row['test_acc']):.2f}% | "
+            f"{row['test_loss']:.4f} | "
+            f"{row['train_time_label']} |"
+        )
+
+    lines.extend(
+        [
+            "",
             "## Active SCNN Latency Jobs",
             "",
             "| Job | Last Completed Epoch | Val Acc | Val Loss | Val Spikes |",
@@ -572,6 +875,9 @@ def build_report(
             "- `event2vec_50_efficiency.png`",
             "- `event2vec_50_learning_curves.png`",
             "- `rate_encoding_progression.png`",
+            "- `latency_encoding_progression.png`",
+            "- `delta_encoding_progression.png`",
+            "- `best_models_training_time.png`",
             "- `scnn_live_latency_progress.png`",
         ]
     )
@@ -583,7 +889,10 @@ def main() -> None:
     ensure_dir(OUTPUT_DIR)
 
     event2vec_rows = load_event2vec_50_runs()
-    rate_progression = load_rate_progression()
+    rate_progression = load_encoding_progression("rate")
+    latency_progression = load_encoding_progression("latency")
+    delta_progression = load_encoding_progression("delta")
+    best_models_training_time = load_best_models_training_time()
     live_latency_rows = load_live_scnn_latency()
 
     write_csv(
@@ -622,7 +931,34 @@ def main() -> None:
     write_csv(
         OUTPUT_DIR / "rate_progression.csv",
         rate_progression,
-        ["label", "family", "epochs", "test_acc", "test_loss", "test_spike_count"],
+        ["label", "family", "epochs", "encoding", "test_acc", "test_loss", "test_spike_count"],
+    )
+
+    write_csv(
+        OUTPUT_DIR / "latency_progression.csv",
+        latency_progression,
+        ["label", "family", "epochs", "encoding", "test_acc", "test_loss", "test_spike_count"],
+    )
+
+    write_csv(
+        OUTPUT_DIR / "delta_progression.csv",
+        delta_progression,
+        ["label", "family", "epochs", "encoding", "test_acc", "test_loss", "test_spike_count"],
+    )
+
+    write_csv(
+        OUTPUT_DIR / "best_models_training_time.csv",
+        best_models_training_time,
+        [
+            "bundle_label",
+            "label",
+            "encoding",
+            "test_acc",
+            "test_loss",
+            "train_time_hours",
+            "train_time_label",
+            "metrics_path",
+        ],
     )
 
     write_csv(
@@ -645,8 +981,19 @@ def main() -> None:
     save_event2vec_efficiency_chart(event2vec_rows, OUTPUT_DIR / "event2vec_50_efficiency.png")
     save_event2vec_learning_curves(event2vec_rows, OUTPUT_DIR / "event2vec_50_learning_curves.png")
     save_rate_progression_chart(rate_progression, OUTPUT_DIR / "rate_encoding_progression.png")
+    save_encoding_progression_chart(latency_progression, "latency", OUTPUT_DIR / "latency_encoding_progression.png")
+    save_encoding_progression_chart(delta_progression, "delta", OUTPUT_DIR / "delta_encoding_progression.png")
+    save_best_models_training_time_chart(best_models_training_time, OUTPUT_DIR / "best_models_training_time.png")
     save_live_latency_chart(live_latency_rows, OUTPUT_DIR / "scnn_live_latency_progress.png")
-    build_report(event2vec_rows, rate_progression, live_latency_rows, OUTPUT_DIR / "report.md")
+    build_report(
+        event2vec_rows,
+        rate_progression,
+        latency_progression,
+        delta_progression,
+        best_models_training_time,
+        live_latency_rows,
+        OUTPUT_DIR / "report.md",
+    )
 
     print(f"Wrote analysis bundle to {OUTPUT_DIR}")
 
