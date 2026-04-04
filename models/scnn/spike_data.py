@@ -10,6 +10,8 @@ from scipy.io import loadmat
 from snntorch import spikegen
 from torch.utils.data import DataLoader, Dataset
 
+from .config import resolve_project_path
+
 EncodingMode = Literal["rate", "latency", "delta"]
 
 
@@ -31,6 +33,14 @@ class ASLDVSSpikeDataset(Dataset):
     Output shape per item:
     - rate/latency: [num_steps, 2, height, width]
     - delta:        [num_steps, 2, height, width]
+
+    Representation notes:
+    - `rate` now preserves the temporal event bins and applies a per-bin
+      Poisson spike conversion.
+    - `latency` still encodes a single normalized activity map into
+      time-to-first-spike, because snntorch latency coding is defined for a
+      static feature map rather than a time-varying sequence.
+    - `delta` operates on the same temporal event bins as `rate`.
     """
 
     def __init__(
@@ -67,7 +77,9 @@ class ASLDVSSpikeDataset(Dataset):
         x, y, ts, pol = self._load_events(path)
         temporal = self._events_to_temporal_channels(x, y, ts, pol)
 
-        if self.encoding == "delta":
+        if self.encoding == "rate":
+            spikes = spikegen.rate(temporal, time_var_input=True)
+        elif self.encoding == "delta":
             spikes = spikegen.delta(
                 temporal,
                 threshold=self.delta_threshold,
@@ -75,19 +87,19 @@ class ASLDVSSpikeDataset(Dataset):
                 off_spike=True,
             )
         else:
-            static_image = temporal.sum(dim=0)
-            static_image = static_image / (static_image.max() + 1e-8)
-            if self.encoding == "rate":
-                spikes = spikegen.rate(static_image, num_steps=self.num_steps)
-            else:
-                spikes = spikegen.latency(
-                    static_image,
-                    num_steps=self.num_steps,
-                    normalize=True,
-                    clip=True,
-                )
+            static_image = self._temporal_to_static_image(temporal)
+            spikes = spikegen.latency(
+                static_image,
+                num_steps=self.num_steps,
+                normalize=True,
+                clip=True,
+            )
 
         return spikes.to(torch.float32), label
+
+    def _temporal_to_static_image(self, temporal: torch.Tensor) -> torch.Tensor:
+        static_image = temporal.sum(dim=0)
+        return static_image / (static_image.max() + 1e-8)
 
     def _load_events(self, path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         mat = loadmat(path)
@@ -220,7 +232,7 @@ def build_asldvs_splits(
     seed: int = 42,
     delta_threshold: float = 0.1,
 ) -> SplitDatasets:
-    data_root = Path(data_root).expanduser().resolve()
+    data_root = resolve_project_path(data_root).resolve()
     sample_paths, class_to_idx = _collect_samples(data_root)
     train_paths, val_paths, test_paths = _stratified_split(
         sample_paths,

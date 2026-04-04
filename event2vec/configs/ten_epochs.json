@@ -1,0 +1,8 @@
+{
+  "train": {
+    "epochs": 10
+  },
+  "result": {
+    "out_dir": "runs/event2vec_10_epochs"
+  }
+}

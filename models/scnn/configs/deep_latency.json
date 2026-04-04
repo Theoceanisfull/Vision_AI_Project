@@ -16,7 +16,7 @@
     "pin_memory": false
   },
   "model": {
-    "architecture": "base",
+    "architecture": "deep",
     "input_channels": 2,
     "num_classes": 24,
     "conv_channels": [
@@ -41,7 +41,7 @@
   },
   "train": {
     "mode": "manual",
-    "epochs": 5,
+    "epochs": 10,
     "lr": 0.001,
     "weight_decay": 1e-05,
     "optimizer": "adam",
@@ -61,7 +61,7 @@
   },
   "result": {
     "out_dir": "runs/scnn",
-    "run_name": "base_latency",
+    "run_name": "deep_latency",
     "save_plots": true,
     "save_checkpoint": true
   }

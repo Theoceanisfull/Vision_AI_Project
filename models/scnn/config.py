@@ -27,6 +27,15 @@ LossType = Literal[
 ]
 RegularizerType = Literal["none", "l1_rate_sparsity"]
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def resolve_project_path(path: str | Path) -> Path:
+    p = Path(path).expanduser()
+    if p.is_absolute():
+        return p
+    return PROJECT_ROOT / p
+
 
 @dataclass
 class DataConfig:
@@ -101,13 +110,13 @@ class SNNConfig:
         return asdict(self)
 
     def save_json(self, path: str | Path) -> None:
-        path = Path(path)
+        path = resolve_project_path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.to_dict(), indent=2))
 
     @classmethod
     def from_json(cls, path: str | Path) -> "SNNConfig":
-        payload = json.loads(Path(path).read_text())
+        payload = json.loads(resolve_project_path(path).read_text())
         return cls.from_dict(payload)
 
     @classmethod
@@ -129,5 +138,7 @@ __all__ = [
     "TrainConfig",
     "ResultConfig",
     "SNNConfig",
+    "PROJECT_ROOT",
     "default_config",
+    "resolve_project_path",
 ]

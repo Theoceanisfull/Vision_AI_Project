@@ -13,11 +13,11 @@ from .presets import apply_encoding_preset
 from .t_loop import run_training
 
 ENCODINGS = ("rate", "latency", "delta")
-DETACHED_CHILD_ENV = "SCNN_TRAIN_THREE_BASE_CHILD"
+DETACHED_CHILD_ENV = "SCNN_TRAIN_THREE_DEEP_CHILD"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train 3 base Conv-SNN models: rate, latency, delta")
+    parser = argparse.ArgumentParser(description="Train 3 deep Conv-SNN models: rate, latency, delta")
     parser.add_argument(
         "--base-config",
         type=str,
@@ -27,8 +27,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out-summary",
         type=str,
-        default="runs/scnn/base_encoding_comparison/summary.json",
+        default="runs/scnn/deep_encoding_comparison/summary.json",
         help="Output summary JSON path",
+    )
+    parser.add_argument(
+        "--extra-epochs",
+        type=int,
+        default=5,
+        help="Additional epochs to add on top of the base config for full deep runs",
     )
     parser.add_argument(
         "--quick",
@@ -64,19 +70,21 @@ def build_launch_artifacts() -> tuple[Path, Path]:
     launch_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return (
-        launch_dir / f"train_three_base_{stamp}.log",
-        launch_dir / f"train_three_base_{stamp}.pid",
+        launch_dir / f"train_three_deep_{stamp}.log",
+        launch_dir / f"train_three_deep_{stamp}.pid",
     )
 
 
 def launch_background(args: argparse.Namespace) -> None:
     log_path, pid_path = build_launch_artifacts()
-    cmd = [sys.executable, "-u", "-m", "models.scnn.train_three_base", "--foreground"]
+    cmd = [sys.executable, "-u", "-m", "models.scnn.train_three_deep", "--foreground"]
 
     if args.base_config != "models/scnn/default_config.json":
         cmd.extend(["--base-config", args.base_config])
-    if args.out_summary != "runs/scnn/base_encoding_comparison/summary.json":
+    if args.out_summary != "runs/scnn/deep_encoding_comparison/summary.json":
         cmd.extend(["--out-summary", args.out_summary])
+    if args.extra_epochs != 5:
+        cmd.extend(["--extra-epochs", str(args.extra_epochs)])
     if args.quick:
         cmd.append("--quick")
 
@@ -109,20 +117,21 @@ def main() -> None:
         return
 
     base_cfg = load_config(args.base_config)
-
     records: list[dict] = []
 
     for enc in ENCODINGS:
         cfg = SNNConfig.from_dict(base_cfg.to_dict())
-        cfg.model.architecture = "base"
+        cfg.model.architecture = "deep"
         cfg.data.encoding = enc
         apply_encoding_preset(cfg)
-        cfg.result.run_name = f"base_{enc}" if not args.quick else f"base_{enc}_quick"
+        cfg.result.run_name = f"deep_{enc}" if not args.quick else f"deep_{enc}_quick"
 
         if args.quick:
             apply_quick_overrides(cfg)
+        else:
+            cfg.train.epochs += args.extra_epochs
 
-        print(f"\n=== Training encoding: {enc} ===")
+        print(f"\n=== Training encoding: {enc} (architecture=deep, epochs={cfg.train.epochs}) ===")
         result = run_training(cfg)
 
         record = {

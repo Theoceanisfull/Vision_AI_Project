@@ -11,7 +11,7 @@
     "train_ratio": 0.7,
     "val_ratio": 0.15,
     "seed": 42,
-    "delta_threshold": 0.1,
+    "delta_threshold": 0.05,
     "num_workers": 0,
     "pin_memory": false
   },
@@ -32,27 +32,27 @@
     "pool_kernel": 2,
     "hidden_size": 256,
     "beta": 0.9,
-    "threshold": 1.0,
+    "threshold": 0.75,
     "surrogate": "fast_sigmoid",
     "surrogate_kwargs": {
       "slope": 25.0
     },
-    "dropout": 0.2
+    "dropout": 0.1
   },
   "train": {
     "mode": "manual",
     "epochs": 5,
-    "lr": 0.001,
+    "lr": 0.0005,
     "weight_decay": 1e-05,
     "optimizer": "adam",
-    "loss": "ce_rate_loss",
+    "loss": "ce_count_loss",
     "loss_kwargs": {},
     "regularizer": "none",
     "regularizer_kwargs": {},
     "regularizer_weight": 0.0001,
     "accuracy_fn": "accuracy_rate",
     "tbptt_k": 5,
-    "grad_clip": 1.0,
+    "grad_clip": 0.5,
     "max_train_batches": null,
     "max_val_batches": null,
     "max_test_batches": null,

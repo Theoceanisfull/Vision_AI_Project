@@ -1,0 +1,57 @@
+{
+  "data": {
+    "data_root": "data/ASLDVS",
+    "encoding": "rate",
+    "sensor_size": [
+      180,
+      240
+    ],
+    "pool_kernel": [
+      6,
+      8
+    ],
+    "num_steps": 20,
+    "max_tokens": 1024,
+    "batch_size": 32,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "seed": 42,
+    "delta_threshold": 0.1,
+    "num_workers": 8,
+    "pin_memory": true,
+    "persistent_workers": true
+  },
+  "model": {
+    "num_classes": 24,
+    "d_model": 64,
+    "depth": 2,
+    "num_heads": 2,
+    "ffn_dim": 128,
+    "dropout": 0.1,
+    "pool_after_each_block": [
+      false,
+      false
+    ]
+  },
+  "train": {
+    "epochs": 5,
+    "lr": 0.0003,
+    "weight_decay": 0.0001,
+    "optimizer": "adamw",
+    "label_smoothing": 0.0,
+    "grad_clip": 1.0,
+    "max_train_batches": null,
+    "max_val_batches": null,
+    "max_test_batches": null,
+    "log_every": 50,
+    "device": "auto",
+    "amp": true,
+    "amp_dtype": "bfloat16"
+  },
+  "result": {
+    "out_dir": "runs/event2vec",
+    "run_name": "rate",
+    "save_plots": true,
+    "save_checkpoint": true
+  }
+}
