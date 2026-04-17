@@ -8,7 +8,7 @@ import math
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Iterable
+from typing import Any, Iterable
 
 import cv2
 import matplotlib.pyplot as plt
@@ -27,7 +27,6 @@ if str(EVENTGAN_CODE_ROOT) not in sys.path:
 from event2vec.config import Event2VecConfig, default_config, resolve_project_path
 from event2vec.data import ASLDVSEvent2VecDataset, collate_event_sequences
 from event2vec.train import build_model, resolve_device, run_training
-from models.eventgan_base import EventGANBase
 
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png"}
 
@@ -123,7 +122,15 @@ def load_event2vec(checkpoint_path: Path, device_name: str) -> tuple[torch.nn.Mo
     return model, cfg, class_to_idx, device
 
 
-def load_eventgan(checkpoint_dir: Path) -> EventGANBase:
+def load_eventgan(checkpoint_dir: Path) -> Any:
+    if not EVENTGAN_CODE_ROOT.exists():
+        raise FileNotFoundError(
+            f"EventGAN code was not found under {EVENTGAN_CODE_ROOT}. "
+            "Clone the alexzzhu/EventGAN repository into Vision_AI_Project/EventGAN first."
+        )
+
+    from models.eventgan_base import EventGANBase
+
     options = SimpleNamespace(
         n_image_channels=1,
         n_time_bins=9,
@@ -208,6 +215,41 @@ def collect_image_paths(
     return image_paths
 
 
+def resolve_image_root_for_classes(image_root: Path, class_names: list[str]) -> Path:
+    candidates = [image_root]
+    candidates.extend(path for path in image_root.rglob("*") if path.is_dir() and path != image_root)
+
+    best_path = image_root
+    best_score = -1
+    for candidate in candidates:
+        score = sum(1 for class_name in class_names if (candidate / class_name).is_dir())
+        if score > best_score:
+            best_score = score
+            best_path = candidate
+    return best_path
+
+
+def collect_generated_paths(
+    generated_root: Path,
+    class_names: list[str],
+    *,
+    samples_per_class: int | None,
+    seed: int,
+) -> list[Path]:
+    rng = np.random.default_rng(seed)
+    generated_paths: list[Path] = []
+    for class_name in class_names:
+        class_dir = generated_root / class_name
+        if not class_dir.exists():
+            continue
+        paths = sorted(path for path in class_dir.iterdir() if path.is_file() and path.suffix.lower() == ".mat")
+        if samples_per_class is not None and len(paths) > samples_per_class:
+            selected = rng.choice(len(paths), size=samples_per_class, replace=False)
+            paths = [paths[int(index)] for index in sorted(selected)]
+        generated_paths.extend(paths)
+    return generated_paths
+
+
 def event_volume_to_arrays(
     volume: torch.Tensor,
     *,
@@ -217,15 +259,17 @@ def event_volume_to_arrays(
 ) -> dict[str, np.ndarray]:
     vol = volume.detach().float().cpu().numpy()
     vol = np.maximum(vol, 0.0)
+    height, width = vol.shape[-2:]
     weights = vol.reshape(-1)
     total = float(weights.sum())
     if not math.isfinite(total) or total <= 0:
-        height, width = vol.shape[-2:]
         x = rng.integers(0, width, size=1, dtype=np.int16)
         y = rng.integers(0, height, size=1, dtype=np.int16)
+        y_raw = (height - 1 - y).astype(np.int16)
         return {
             "x": x.reshape(-1, 1),
-            "y": y.reshape(-1, 1),
+            # Store y in the same bottom-origin convention as the ASL-DVS .mat files.
+            "y": y_raw.reshape(-1, 1),
             "ts": np.zeros((1, 1), dtype=np.int32),
             "pol": np.ones((1, 1), dtype=np.uint8),
         }
@@ -234,6 +278,7 @@ def event_volume_to_arrays(
     probabilities = weights / total
     flat_indices = rng.choice(weights.size, size=event_count, replace=True, p=probabilities)
     channel, y, x = np.unravel_index(flat_indices, vol.shape)
+    y_raw = height - 1 - y
 
     n_bins = vol.shape[0] // 2
     polarity = (channel < n_bins).astype(np.uint8)
@@ -243,7 +288,7 @@ def event_volume_to_arrays(
     order = np.argsort(ts, kind="stable")
     return {
         "x": x[order].astype(np.int16).reshape(-1, 1),
-        "y": y[order].astype(np.int16).reshape(-1, 1),
+        "y": y_raw[order].astype(np.int16).reshape(-1, 1),
         "ts": ts[order].astype(np.int32).reshape(-1, 1),
         "pol": polarity[order].astype(np.uint8).reshape(-1, 1),
     }
@@ -254,7 +299,7 @@ def generate_eventgan_dataset(
     image_paths: list[Path],
     image_root: Path,
     output_root: Path,
-    eventgan: EventGANBase,
+    eventgan: Any | None,
     sensor_size: tuple[int, int],
     batch_size: int,
     motion_shift: int,
@@ -277,6 +322,12 @@ def generate_eventgan_dataset(
     if not to_generate:
         print(f"Using existing generated events under {output_root}")
         return generated_paths
+
+    if eventgan is None:
+        raise FileNotFoundError(
+            "Some EventGAN outputs are missing and no usable EventGAN model was loaded. "
+            f"Expected checkpoints under {output_root} or EventGAN weights under the configured checkpoint dir."
+        )
 
     print(f"Generating EventGAN event data for {len(to_generate)} image pairs")
     eventgan.generator.eval()
@@ -547,6 +598,22 @@ def select_video_rows(rows: list[dict], max_samples: int) -> list[dict]:
     return selected[:max_samples]
 
 
+def select_showcase_rows(rows: list[dict], max_samples: int) -> list[dict]:
+    by_class: dict[str, dict] = {}
+    for row in rows:
+        best = by_class.get(row["class"])
+        row_score = (int(bool(row["correct"])), float(row["confidence"]), float(row["token_count"]))
+        if best is None:
+            by_class[row["class"]] = row
+            continue
+        best_score = (int(bool(best["correct"])), float(best["confidence"]), float(best["token_count"]))
+        if row_score > best_score:
+            by_class[row["class"]] = row
+
+    selected = [by_class[class_name] for class_name in sorted(by_class)]
+    return selected[:max_samples]
+
+
 def render_realtime_video(
     *,
     rows: list[dict],
@@ -650,6 +717,159 @@ def render_realtime_video(
         writer.release()
 
 
+def source_image_for_event_path(path: Path) -> str | None:
+    mat = loadmat(path)
+    raw = mat.get("source_image")
+    if raw is None:
+        return None
+    value = np.asarray(raw).reshape(-1)
+    if value.size == 0:
+        return None
+    first = value[0]
+    if isinstance(first, bytes):
+        return first.decode("utf-8", errors="replace")
+    return str(first)
+
+
+def render_eventgan2vec_video(
+    *,
+    rows: list[dict],
+    summary: dict,
+    output_path: Path,
+    checkpoint_path: Path,
+    frames_per_sample: int,
+    fps: int,
+    max_samples: int,
+) -> None:
+    from PIL import Image, ImageDraw
+
+    from export_asldvs_demo_videos import (
+        ACCENT,
+        BG,
+        CANVAS_SIZE,
+        CARD,
+        FONTS,
+        GREEN,
+        HEADER,
+        MUTED,
+        RED,
+        TEXT,
+        draw_multiline,
+        draw_progress_bar,
+        event_matrix_to_rgb,
+        format_time_window,
+        make_time_frames,
+        render_intro_card,
+        write_mp4,
+    )
+
+    selected_rows = select_showcase_rows(rows, max_samples=max_samples)
+    if not selected_rows:
+        return
+
+    checkpoint_label = checkpoint_path.parent.parent.name.replace("_", " ")
+    checkpoint_encoding = checkpoint_path.parent.name
+
+    def render_frame(
+        row: dict,
+        *,
+        sample_index: int,
+        total_samples: int,
+        frame_index: int,
+        total_frames: int,
+        frame_image: Image.Image,
+        frame_start_us: int,
+        frame_end_us: int,
+    ) -> np.ndarray:
+        canvas = Image.new("RGB", CANVAS_SIZE, BG)
+        draw = ImageDraw.Draw(canvas)
+        draw.rectangle((0, 0, CANVAS_SIZE[0], 78), fill=HEADER)
+        draw.text((44, 18), "EventGAN2Vec", font=FONTS["title"], fill=(255, 255, 255))
+        draw.text(
+            (48, 92),
+            "EventGAN-generated events classified with the Event2Vec 50e latency checkpoint",
+            font=FONTS["subtitle"],
+            fill=MUTED,
+        )
+
+        panel = (48, 128, 854, 675)
+        draw.rounded_rectangle(panel, radius=26, fill=CARD)
+        frame_resized = frame_image.resize((760, 570), resample=Image.Resampling.NEAREST)
+        canvas.paste(frame_resized, (72, 146))
+
+        info = (882, 128, 1236, 675)
+        draw.rounded_rectangle(info, radius=26, fill=CARD)
+        badge_box = (906, 154, 1210, 224)
+        draw.rounded_rectangle(badge_box, radius=20, fill=(255, 241, 228))
+        draw.text(
+            (930, 173),
+            f"{summary['accuracy'] * 100:.2f}% accuracy",
+            font=FONTS["badge"],
+            fill=ACCENT,
+        )
+
+        pred_color = GREEN if row["correct"] else RED
+        source_image = source_image_for_event_path(Path(row["path"]))
+        source_label = Path(source_image).name if source_image else "source image unavailable"
+        lines = [
+            ("Ground truth", FONTS["card_title"], MUTED),
+            (row["class"].upper(), FONTS["card_title"], TEXT),
+            ("Prediction", FONTS["card_title"], MUTED),
+            (row["prediction"].upper(), FONTS["letter"], pred_color),
+            (f"Confidence: {row['confidence'] * 100:.1f}%", FONTS["body"], TEXT),
+            (f"Tokens: {int(round(row['token_count']))}", FONTS["body"], TEXT),
+            (f"Checkpoint: {checkpoint_label} / {checkpoint_encoding}", FONTS["small"], TEXT),
+            (f"Time bin: {format_time_window(frame_start_us, frame_end_us)}", FONTS["small"], MUTED),
+            (f"Clip {sample_index + 1:02d} / {total_samples:02d}", FONTS["small"], MUTED),
+            (Path(row["path"]).name, FONTS["tiny"], MUTED),
+            (source_label, FONTS["tiny"], MUTED),
+            ("Blue = OFF events  |  Red = ON events", FONTS["tiny"], MUTED),
+        ]
+        draw_multiline(draw, x=910, y=254, lines=lines, gap=7)
+        draw_progress_bar(
+            draw,
+            x=910,
+            y=628,
+            width=280,
+            height=14,
+            fraction=(sample_index * total_frames + frame_index + 1) / float(total_samples * total_frames),
+            fill=ACCENT,
+        )
+        return np.asarray(canvas, dtype=np.uint8)
+
+    def iter_frames() -> Iterable[np.ndarray]:
+        yield from render_intro_card(
+            "EventGAN2Vec",
+            f"EventGAN outputs scored {summary['accuracy'] * 100:.2f}% over {summary['total']} generated samples.",
+            "Each clip shows a generated event sequence and the final latency-model prediction.",
+        )
+
+        for sample_index, row in enumerate(selected_rows):
+            mat = loadmat(row["path"])
+            events = {key: np.asarray(mat[key]).reshape(-1) for key in ("x", "y", "ts", "pol")}
+            frames, edges = make_time_frames(events, n_frames=frames_per_sample)
+            clip_limit = float(np.abs(frames).max())
+            clip_limit = clip_limit if clip_limit > 0 else 1.0
+
+            for frame_index in range(frames_per_sample):
+                event_image = event_matrix_to_rgb(frames[frame_index], limit=clip_limit)
+                start_us = int(edges[frame_index])
+                end_us = int(edges[frame_index + 1])
+                yield render_frame(
+                    row,
+                    sample_index=sample_index,
+                    total_samples=len(selected_rows),
+                    frame_index=frame_index,
+                    total_frames=frames_per_sample,
+                    frame_image=event_image,
+                    frame_start_us=start_us,
+                    frame_end_us=end_us,
+                )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    write_mp4(output_path, iter_frames(), fps=fps)
+
+
 def write_manifest(image_paths: list[Path], generated_paths: list[Path], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="") as handle:
@@ -667,14 +887,15 @@ def write_manifest(image_paths: list[Path], generated_paths: list[Path], output_
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate EventGAN ASL events and classify with Event2Vec")
-    parser.add_argument("--image-root", default="data/asl_dataset")
-    parser.add_argument("--generated-root", default="EventGAN/generated_events/asl_dataset_eventgan")
-    parser.add_argument("--output-dir", default="EventGAN/outputs/asl_event2vec")
+    parser.add_argument("--image-root", default="data/asl-data")
+    parser.add_argument("--generated-root", default="EventGAN/generated_events/asl_data_eventgan")
+    parser.add_argument("--output-dir", default="Analytics/eventgan2vec")
+    parser.add_argument("--analytics-video-path", default="Analytics/EventGAN2Vec.mp4")
     parser.add_argument("--eventgan-checkpoint-dir", default="EventGAN/logs/EventGAN/checkpoints")
-    parser.add_argument("--event2vec-checkpoint", default=None)
-    parser.add_argument("--event2vec-run-name", default="eventgan_rate_quick")
+    parser.add_argument("--event2vec-checkpoint", default="runs/event2vec_50_epochs/latency/checkpoint_best.pt")
+    parser.add_argument("--event2vec-run-name", default="eventgan_latency_50e")
     parser.add_argument("--force-train-event2vec", action="store_true")
-    parser.add_argument("--encoding", choices=["rate", "latency", "delta"], default="rate")
+    parser.add_argument("--encoding", choices=["rate", "latency", "delta"], default="latency")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--samples-per-class", type=int, default=None)
     parser.add_argument("--eventgan-batch-size", type=int, default=8)
@@ -704,6 +925,7 @@ def main() -> None:
     image_root = resolve_project_path(args.image_root)
     generated_root = resolve_project_path(args.generated_root)
     output_dir = resolve_project_path(args.output_dir)
+    analytics_video_path = resolve_project_path(args.analytics_video_path)
     checkpoint_dir = resolve_project_path(args.eventgan_checkpoint_dir)
     sensor_size = tuple(args.sensor_size)
 
@@ -712,31 +934,50 @@ def main() -> None:
     idx_to_class = {idx: class_name for class_name, idx in class_to_idx.items()}
     class_names = [idx_to_class[idx] for idx in sorted(idx_to_class)]
 
-    image_paths = collect_image_paths(
-        image_root,
-        class_names,
-        samples_per_class=args.samples_per_class,
-        seed=args.seed,
-    )
-    if not image_paths:
-        raise FileNotFoundError(f"No supported images found under {image_root}")
+    image_paths = []
+    if image_root.exists():
+        image_root = resolve_image_root_for_classes(image_root, class_names)
+        image_paths = collect_image_paths(
+            image_root,
+            class_names,
+            samples_per_class=args.samples_per_class,
+            seed=args.seed,
+        )
 
-    eventgan = load_eventgan(checkpoint_dir)
-    generated_paths = generate_eventgan_dataset(
-        image_paths=image_paths,
-        image_root=image_root,
-        output_root=generated_root,
-        eventgan=eventgan,
-        sensor_size=sensor_size,
-        batch_size=args.eventgan_batch_size,
-        motion_shift=args.motion_shift,
-        target_events=args.target_events,
-        duration_us=args.duration_us,
-        seed=args.seed,
-        regenerate=args.regenerate,
-    )
+    if image_paths:
+        planned_generated_paths = [
+            generated_root / image_path.relative_to(image_root).parent / f"{image_path.stem}.mat"
+            for image_path in image_paths
+        ]
+        needs_generation = args.regenerate or any(not path.exists() for path in planned_generated_paths)
+        eventgan = load_eventgan(checkpoint_dir) if needs_generation else None
+        generated_paths = generate_eventgan_dataset(
+            image_paths=image_paths,
+            image_root=image_root,
+            output_root=generated_root,
+            eventgan=eventgan,
+            sensor_size=sensor_size,
+            batch_size=args.eventgan_batch_size,
+            motion_shift=args.motion_shift,
+            target_events=args.target_events,
+            duration_us=args.duration_us,
+            seed=args.seed,
+            regenerate=args.regenerate,
+        )
+        write_manifest(image_paths, generated_paths, output_dir / "generation_manifest.csv")
+    else:
+        generated_paths = collect_generated_paths(
+            generated_root,
+            class_names,
+            samples_per_class=args.samples_per_class,
+            seed=args.seed,
+        )
+        if not generated_paths:
+            raise FileNotFoundError(
+                "No source images or generated EventGAN events were found. "
+                f"Checked image root {image_root} and generated root {generated_root}."
+            )
 
-    write_manifest(image_paths, generated_paths, output_dir / "generation_manifest.csv")
     dataset = build_generated_dataset(generated_paths, class_to_idx, cfg)
     rows, summary = evaluate_generated_events(
         model=model,
@@ -755,11 +996,20 @@ def main() -> None:
         model=model,
         idx_to_class=idx_to_class,
         device=device,
-        output_path=output_dir / "eventgan_event2vec_realtime.mp4",
+        output_path=output_dir / "eventgan2vec_realtime.mp4",
         sensor_size=sensor_size,
         max_samples=args.video_max_samples,
         frames_per_sample=args.video_frames_per_sample,
         fps=args.video_fps,
+    )
+    render_eventgan2vec_video(
+        rows=rows,
+        summary=summary,
+        output_path=analytics_video_path,
+        checkpoint_path=event2vec_checkpoint,
+        frames_per_sample=args.video_frames_per_sample,
+        fps=args.video_fps,
+        max_samples=args.video_max_samples,
     )
 
     print(json.dumps({
@@ -769,7 +1019,8 @@ def main() -> None:
         "samples": summary["total"],
         "accuracy": summary["accuracy"],
         "accuracy_chart": str(output_dir / "classification_accuracy.png"),
-        "video": str(output_dir / "eventgan_event2vec_realtime.mp4"),
+        "realtime_video": str(output_dir / "eventgan2vec_realtime.mp4"),
+        "analytics_video": str(analytics_video_path),
     }, indent=2))
 
 
