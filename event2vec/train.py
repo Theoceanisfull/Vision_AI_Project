@@ -12,7 +12,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from models.scnn.result import plot_confusion_matrix, plot_training_history, save_metrics_text
+try:
+    from models.scnn.result import plot_confusion_matrix, plot_training_history, save_metrics_text
+except ModuleNotFoundError:
+    from scnn.scnn.result import plot_confusion_matrix, plot_training_history, save_metrics_text
 
 from .config import Event2VecConfig, default_config, resolve_project_path
 from .data import build_asldvs_event2vec_dataloaders
@@ -29,37 +32,40 @@ def set_random_seed(seed: int) -> None:
 
 def resolve_device(device_cfg: str) -> torch.device:
     if device_cfg == "auto":
-        if not torch.cuda.is_available():
-            return torch.device("cpu")
+        if torch.cuda.is_available():
+            try:
+                query = subprocess.run(
+                    [
+                        "nvidia-smi",
+                        "--query-gpu=index,memory.free,name",
+                        "--format=csv,noheader,nounits",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                candidates: list[tuple[int, int, str]] = []
+                for line in query.stdout.splitlines():
+                    parts = [part.strip() for part in line.split(",", maxsplit=2)]
+                    if len(parts) != 3:
+                        continue
+                    index_str, free_mib_str, gpu_name = parts
+                    candidates.append((int(index_str), int(free_mib_str), gpu_name))
 
-        try:
-            query = subprocess.run(
-                [
-                    "nvidia-smi",
-                    "--query-gpu=index,memory.free,name",
-                    "--format=csv,noheader,nounits",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            candidates: list[tuple[int, int, str]] = []
-            for line in query.stdout.splitlines():
-                parts = [part.strip() for part in line.split(",", maxsplit=2)]
-                if len(parts) != 3:
-                    continue
-                index_str, free_mib_str, gpu_name = parts
-                candidates.append((int(index_str), int(free_mib_str), gpu_name))
+                if candidates:
+                    best_index, best_free_mib, gpu_name = max(candidates, key=lambda item: item[1])
+                    free_gib = best_free_mib / 1024
+                    print(f"Auto-selected GPU {best_index} ({gpu_name}) with {free_gib:.1f} GiB free")
+                    return torch.device(f"cuda:{best_index}")
+            except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
+                pass
 
-            if candidates:
-                best_index, best_free_mib, gpu_name = max(candidates, key=lambda item: item[1])
-                free_gib = best_free_mib / 1024
-                print(f"Auto-selected GPU {best_index} ({gpu_name}) with {free_gib:.1f} GiB free")
-                return torch.device(f"cuda:{best_index}")
-        except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
-            pass
+            return torch.device("cuda")
 
-        return torch.device("cuda")
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return torch.device("mps")
+
+        return torch.device("cpu")
 
     return torch.device(device_cfg)
 
