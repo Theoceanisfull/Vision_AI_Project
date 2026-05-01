@@ -1,0 +1,105 @@
+SCNN Architecture Printout
+
+This is a per-time-step printout of the Conv-SNN architecture. The same step block is applied across T=20 time bins for full sequence processing.
+
+
+=== BASE SCNN ===
+
+Input per step: [B, 2, 180, 240]
+
+Full sequence input: [B, 20, 2, 180, 240]
+
+
+===================================================================================================================
+Layer (type:depth-idx)                   Output Shape              Param #                   Trainable
+===================================================================================================================
+StepWrapper                              [1, 24]                   --                        True
+├─ConvSNN: 1-1                           --                        --                        True
+│    └─ModuleList: 2-5                   --                        (recursive)               True
+│    │    └─Conv2d: 3-1                  [1, 32, 180, 240]         576                       True
+│    └─ModuleList: 2-6                   --                        (recursive)               True
+│    │    └─BatchNorm2d: 3-2             [1, 32, 180, 240]         64                        True
+│    └─ModuleList: 2-7                   --                        --                        --
+│    │    └─Leaky: 3-3                   [1, 32, 180, 240]         --                        --
+│    └─ModuleList: 2-8                   --                        --                        --
+│    │    └─MaxPool2d: 3-4               [1, 32, 90, 120]          --                        --
+│    └─ModuleList: 2-5                   --                        (recursive)               True
+│    │    └─Conv2d: 3-5                  [1, 64, 90, 120]          18,432                    True
+│    └─ModuleList: 2-6                   --                        (recursive)               True
+│    │    └─BatchNorm2d: 3-6             [1, 64, 90, 120]          128                       True
+│    └─ModuleList: 2-7                   --                        --                        --
+│    │    └─Leaky: 3-7                   [1, 64, 90, 120]          --                        --
+│    └─ModuleList: 2-8                   --                        --                        --
+│    │    └─MaxPool2d: 3-8               [1, 64, 45, 60]           --                        --
+│    └─Dropout: 2-9                      [1, 172800]               --                        --
+│    └─Linear: 2-10                      [1, 256]                  44,237,056                True
+│    └─Leaky: 2-11                       [1, 256]                  --                        --
+│    └─Linear: 2-12                      [1, 24]                   6,168                     True
+│    └─Leaky: 2-13                       [1, 24]                   --                        --
+===================================================================================================================
+Total params: 44,262,424
+Trainable params: 44,262,424
+Non-trainable params: 0
+Total mult-adds (Units.MEGABYTES): 268.19
+===================================================================================================================
+Input size (MB): 0.35
+Forward/backward pass size (MB): 33.18
+Params size (MB): 177.05
+Estimated Total Size (MB): 210.58
+===================================================================================================================
+
+
+
+=== DEEP SCNN ===
+
+Input per step: [B, 2, 180, 240]
+
+Full sequence input: [B, 20, 2, 180, 240]
+
+
+===================================================================================================================
+Layer (type:depth-idx)                   Output Shape              Param #                   Trainable
+===================================================================================================================
+StepWrapper                              [1, 24]                   --                        True
+├─ConvSNN: 1-1                           --                        --                        True
+│    └─ModuleList: 2-9                   --                        (recursive)               True
+│    │    └─Conv2d: 3-1                  [1, 32, 180, 240]         576                       True
+│    └─ModuleList: 2-10                  --                        (recursive)               True
+│    │    └─BatchNorm2d: 3-2             [1, 32, 180, 240]         64                        True
+│    └─ModuleList: 2-11                  --                        --                        --
+│    │    └─Leaky: 3-3                   [1, 32, 180, 240]         --                        --
+│    └─ModuleList: 2-12                  --                        --                        --
+│    │    └─MaxPool2d: 3-4               [1, 32, 90, 120]          --                        --
+│    └─ModuleList: 2-9                   --                        (recursive)               True
+│    │    └─Conv2d: 3-5                  [1, 64, 90, 120]          18,432                    True
+│    └─ModuleList: 2-10                  --                        (recursive)               True
+│    │    └─BatchNorm2d: 3-6             [1, 64, 90, 120]          128                       True
+│    └─ModuleList: 2-11                  --                        --                        --
+│    │    └─Leaky: 3-7                   [1, 64, 90, 120]          --                        --
+│    └─ModuleList: 2-12                  --                        --                        --
+│    │    └─MaxPool2d: 3-8               [1, 64, 45, 60]           --                        --
+│    └─ModuleList: 2-9                   --                        (recursive)               True
+│    │    └─Conv2d: 3-9                  [1, 128, 45, 60]          73,728                    True
+│    └─ModuleList: 2-10                  --                        (recursive)               True
+│    │    └─BatchNorm2d: 3-10            [1, 128, 45, 60]          256                       True
+│    └─ModuleList: 2-11                  --                        --                        --
+│    │    └─Leaky: 3-11                  [1, 128, 45, 60]          --                        --
+│    └─ModuleList: 2-12                  --                        --                        --
+│    │    └─MaxPool2d: 3-12              [1, 128, 22, 30]          --                        --
+│    └─Dropout: 2-13                     [1, 84480]                --                        --
+│    └─Linear: 2-14                      [1, 256]                  21,627,136                True
+│    └─Leaky: 2-15                       [1, 256]                  --                        --
+│    └─Linear: 2-16                      [1, 24]                   6,168                     True
+│    └─Leaky: 2-17                       [1, 24]                   --                        --
+===================================================================================================================
+Total params: 21,726,488
+Trainable params: 21,726,488
+Non-trainable params: 0
+Total mult-adds (Units.MEGABYTES): 444.65
+===================================================================================================================
+Input size (MB): 0.35
+Forward/backward pass size (MB): 38.71
+Params size (MB): 86.91
+Estimated Total Size (MB): 125.96
+===================================================================================================================
+

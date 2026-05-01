@@ -1,10 +1,13 @@
-# Dataset files and downloaded archives
-data/
-runs/
+# Team folder layout
+neuromorphic_team/data/
+neuromorphic_team/runs/
 
 # Notebook checkpoints
 **/.ipynb_checkpoints/
 
 # Python cache/build artifacts
-__pycache__/
-*.pyc
+**/__pycache__/
+**/*.pyc
+
+# macOS metadata
+**/.DS_Store
