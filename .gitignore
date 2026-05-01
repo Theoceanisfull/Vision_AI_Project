@@ -1,13 +1,5 @@
-# Team folder layout
+# Datasets
 neuromorphic_team/data/
-neuromorphic_team/runs/
 
-# Notebook checkpoints
-**/.ipynb_checkpoints/
-
-# Python cache/build artifacts
-**/__pycache__/
-**/*.pyc
-
-# macOS metadata
-**/.DS_Store
+# Large generated checkpoints that can block Git hosting pushes
+neuromorphic_team/runs/scnn/*/checkpoint_last.pt

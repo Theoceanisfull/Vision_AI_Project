@@ -1,0 +1,20 @@
+{
+  "train_loss": [
+    3.2472450733184814
+  ],
+  "val_loss": [
+    3.2659599781036377
+  ],
+  "train_acc": [
+    0.0
+  ],
+  "val_acc": [
+    0.0
+  ],
+  "train_spike_count": [
+    8.375
+  ],
+  "val_spike_count": [
+    10.5
+  ]
+}

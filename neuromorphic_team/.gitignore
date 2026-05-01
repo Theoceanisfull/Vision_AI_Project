@@ -1,10 +1,5 @@
-# Dataset files and downloaded archives
+# Datasets
 data/
-runs/
 
-# Notebook checkpoints
-**/.ipynb_checkpoints/
-
-# Python cache/build artifacts
-__pycache__/
-*.pyc
+# Large generated checkpoints that can block Git hosting pushes
+runs/scnn/*/checkpoint_last.pt

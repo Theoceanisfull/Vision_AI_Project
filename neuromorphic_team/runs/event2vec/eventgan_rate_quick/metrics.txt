@@ -1,0 +1,17 @@
+best_val_acc: 0.100000
+best_val_loss: 3.041192
+best_val_spike_count: 188.925000
+best_val_token_count: 188.925000
+checkpoint: best
+device: mps
+last_test_acc: 0.000000
+last_test_loss: 3.754622
+last_test_spike_count: 174.453125
+last_test_token_count: 174.453125
+num_classes: 24
+pooled_sensor_size: [30, 30]
+selected_epoch: 1
+test_acc: 0.096875
+test_loss: 3.009079
+test_spike_count: 175.321875
+test_token_count: 175.321875

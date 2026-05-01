@@ -1,0 +1,5 @@
+device: cpu
+num_classes: 24
+test_acc: 0.000000
+test_loss: 3.348300
+test_spike_count: 21.000000
