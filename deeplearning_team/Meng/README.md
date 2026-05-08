@@ -36,46 +36,6 @@ OpenPose 2D keypoints (25 pose + 21 left hand + 21 right hand = **201 dims**) ar
 
 ---
 
-## Repo Structure
-
-```
-word/
-  train.py              — train word-level classifier
-  evaluate.py           — top-1 / top-5 accuracy on any split
-  demo.py               — single-video inference with overlay
-  save_results.py       — generate training plots and summary
-  configs/              — YAML configs for each dataset/scale
-  scripts/
-    download_data.py    — download WLASL or ASL-Citizen from Kaggle
-  src/
-    dataset.py          — ASLCitizenDataset, WLASLDataset, read_video_clip
-    model.py            — R(2+1)D-18 classifier wrapper
-    utils.py            — accuracy, cosine LR schedule, checkpoint helpers
-
-sentence/
-  train.py              — train Keypoint Transformer + mBART
-  evaluate.py           — BLEU-4 on any split
-  demo.py               — text predictions on random/named test samples
-  demo_gif.py           — animated GIF: video + word-by-word translation
-  save_results.py       — generate training plots and summary
-  configs/
-    config_how2sign.yaml
-    config_how2sign_s3d.yaml
-  scripts/
-    preprocess_keypoints.py  — OpenPose JSON -> .npy (run once)
-    extract_s3d_features.py  — extract S3D features (S3D variant)
-  src/
-    dataset.py          — How2SignDataset, How2SignS3DDataset, H2SCollator
-    model.py            — KeypointEncoder, SignTranslationModel, build_model
-    utils.py            — compute_bleu, checkpoint helpers
-
-assets/                 — diagrams and demo GIFs
-checkpoints/            — saved model weights
-results/                — training plots and summaries
-```
-
----
-
 ## Setup
 
 ### Create and activate conda environment
