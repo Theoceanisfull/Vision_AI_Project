@@ -1,0 +1,32 @@
+data:
+  data_root: "data/how2sign"
+  num_frames: 32            # S3D temporal tokens (256 video frames / 8x downsampling)
+  max_train_samples: null
+  num_workers: 4
+
+model:
+  feature_type: "s3d"       # triggers S3DSignTranslationModel + How2SignS3DDataset
+  decoder_model: "facebook/mbart-large-cc25"
+  tgt_lang: "en_XX"
+  keypoint_dim: 1024        # S3D output feature dimension
+  encoder_d_model: 1024     # match S3D dim — no projection needed
+  encoder_nhead: 8
+  encoder_layers: 4
+  encoder_ff_dim: 2048
+  dropout: 0.3              # increased from 0.1 — S3D features are powerful, needs regularization
+
+training:
+  epochs: 60
+  batch_size: 8
+  accumulation_steps: 4     # effective batch = 32
+  learning_rate: 3.0e-5     # lowered from 5e-5 — less encoder tuning needed on top of S3D
+  decoder_lr: 5.0e-5        # lowered from 1e-4 — prevent decoder from overfitting fast
+  weight_decay: 1.0e-4
+  warmup_steps: 300         # batch-level optimizer steps (~0.3 epochs on 31K samples)
+  max_tgt_len: 128
+  num_beams: 4
+  bleu_eval_every: 2
+  bleu_max_samples: 200
+  early_stopping_patience: 8   # stop if BLEU doesn't improve for 8 evaluations (16 epochs)
+  checkpoint_dir: "checkpoints/how2sign_s3d"
+  log_dir: "logs/how2sign_s3d"

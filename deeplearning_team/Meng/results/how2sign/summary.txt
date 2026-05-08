@@ -1,0 +1,27 @@
+How2Sign Sign Language Translation ¡ª Training Summary
+=======================================================
+
+Model
+  Decoder        : facebook/mbart-large-cc25
+  Encoder layers : 4  d_model=512  heads=8
+  Keypoint dim   : 201
+  Dropout        : 0.1
+
+Dataset
+  Data root      : data/how2sign
+  Num frames     : 128
+  Max train samp : None
+
+Training
+  Epochs         : 60
+  Batch size     : 8  (accum x4 = effective 32)
+  Encoder LR     : 0.0001
+  Decoder LR     : 5e-05
+  Total time     : 5h 50m 37s
+  Avg epoch time : 5.8 min
+
+Results
+  Best Val BLEU-4 : 2.42  (epoch 27)
+  Test BLEU-4     : not evaluated
+
+Checkpoint     : checkpoints/how2sign\best.pth

@@ -1,0 +1,39 @@
+ASL-Citizen ASL Recognition ¡ª Training Summary
+==================================================
+
+Model
+  Backbone       : r2plus1d_18
+  Parameters     : 32.7M
+  Dropout        : 0.5
+  Pretrained     : Kinetics-400
+
+Dataset
+  Classes        : 2731
+  Input frames   : 16
+  Frame size     : 112x112
+
+Training
+  Epochs         : 51
+  Batch size     : 24
+  Base LR        : 0.0001
+  Head LR mult   : 10x
+  Weight decay   : 0.0001
+  Label smooth   : 0.1
+  Warmup epochs  : 5
+  Mixed precision: True
+  Total time     : 27h 0m 59s
+  Avg epoch time : 31.8 min
+
+Results (best checkpoint ¡ª epoch 50)
+  Val Top-1      : 69.62%
+  Val Top-5      : 91.14%
+  Train Top-1    : 99.87%
+  Train Loss     : 1.3800
+
+Test Evaluation (best checkpoint, unseen data)
+  Test Top-1     : not evaluated
+  Test Top-5     : not evaluated
+
+Checkpoints
+  Best model     : checkpoints/aslcitizen_full/best.pth
+  Last model     : checkpoints/aslcitizen_full/last.pth
