@@ -1,0 +1,29 @@
+data:
+  csv_dir: "data/datasets/abd0kamel/asl-citizen/versions/1/ASL_Citizen/splits"
+  video_dir: "data/datasets/abd0kamel/asl-citizen/versions/1/ASL_Citizen/videos"
+  top_n_classes: null   # use all 2731 classes
+  num_frames: 16
+  resize: 128
+  crop: 112
+  num_workers: 6
+
+model:
+  backbone: "r2plus1d_18"
+  pretrained: true
+  num_classes: 2731
+  dropout: 0.5
+
+training:
+  epochs: 80
+  batch_size: 24
+  learning_rate: 0.0001
+  head_lr_multiplier: 10
+  weight_decay: 0.0001
+  label_smoothing: 0.1
+  gradient_clip: 1.0
+  warmup_epochs: 5
+  use_amp: true
+  checkpoint_dir: "checkpoints/aslcitizen_full"
+  log_dir: "logs/aslcitizen_full"
+  results_dir: "results/aslcitizen_full"
+  save_every: 5

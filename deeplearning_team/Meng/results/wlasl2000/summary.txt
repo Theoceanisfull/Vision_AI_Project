@@ -1,0 +1,39 @@
+WLASL-2000 ASL Recognition ¡ª Training Summary
+==================================================
+
+Model
+  Backbone       : r2plus1d_18
+  Parameters     : 32.3M
+  Dropout        : 0.5
+  Pretrained     : Kinetics-400
+
+Dataset
+  Classes        : 2000
+  Input frames   : 16
+  Frame size     : 112x112
+
+Training
+  Epochs         : 80
+  Batch size     : 24
+  Base LR        : 0.0001
+  Head LR mult   : 10x
+  Weight decay   : 0.0001
+  Label smooth   : 0.1
+  Warmup epochs  : 5
+  Mixed precision: True
+  Total time     : 9h 14m 38s
+  Avg epoch time : 6.9 min
+
+Results (best checkpoint ¡ª epoch 78)
+  Val Top-1      : 7.41%
+  Val Top-5      : 25.03%
+  Train Top-1    : 93.21%
+  Train Loss     : 1.6400
+
+Test Evaluation (best checkpoint, unseen data)
+  Test Top-1     : 6.29%  (1414 samples)
+  Test Top-5     : 23.41%
+
+Checkpoints
+  Best model     : checkpoints/wlasl2000/best.pth
+  Last model     : checkpoints/wlasl2000/last.pth

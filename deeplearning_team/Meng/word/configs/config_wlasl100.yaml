@@ -1,0 +1,30 @@
+data:
+  json_path: "data/datasets/risangbaskoro/wlasl-processed/versions/5/WLASL_v0.3.json"
+  video_dir: "data/datasets/risangbaskoro/wlasl-processed/versions/5/videos"
+  nslt_path: "data/datasets/risangbaskoro/wlasl-processed/versions/5/nslt_100.json"
+  class_list_path: "data/datasets/risangbaskoro/wlasl-processed/versions/5/wlasl_class_list.txt"
+  num_frames: 16
+  resize: 128
+  crop: 112
+  num_workers: 6
+
+model:
+  backbone: "r2plus1d_18"
+  pretrained: true
+  num_classes: 100
+  dropout: 0.5
+
+training:
+  epochs: 80
+  batch_size: 24
+  learning_rate: 0.0001
+  head_lr_multiplier: 10
+  weight_decay: 0.0001
+  label_smoothing: 0.1
+  gradient_clip: 1.0
+  warmup_epochs: 5
+  use_amp: true
+  checkpoint_dir: "checkpoints/wlasl100"
+  log_dir: "logs/wlasl100"
+  results_dir: "results/wlasl100"
+  save_every: 5

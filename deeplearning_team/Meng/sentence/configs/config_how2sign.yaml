@@ -1,0 +1,32 @@
+data:
+  data_root: "data/how2sign"
+  num_frames: 128          # frames per clip (longer clips are uniformly resampled)
+  max_train_samples: null  # null = full 31K; set e.g. 2000 for quick experiments
+  num_workers: 4
+
+model:
+  decoder_model: "facebook/mbart-large-cc25"
+  tgt_lang: "en_XX"
+  keypoint_dim: 201        # (25 pose + 21 left_hand + 21 right_hand) * 3
+                           # set to 411 if preprocessed with --include_face
+  encoder_d_model: 512
+  encoder_nhead: 8
+  encoder_layers: 4
+  encoder_ff_dim: 2048
+  dropout: 0.1
+
+training:
+  epochs: 60
+  batch_size: 8
+  accumulation_steps: 4    # effective batch = 8 * 4 = 32
+  learning_rate: 1.0e-4    # visual encoder LR
+  decoder_lr: 5.0e-5       # mBART decoder LR (lower, already pretrained)
+  weight_decay: 1.0e-4
+  warmup_steps: 500         # batch-level optimizer steps (~0.5 epochs on 31K samples)
+  max_tgt_len: 128
+  num_beams: 4
+  bleu_eval_every: 2       # run BLEU on val set every N epochs
+  bleu_max_samples: 200   # cap val samples for BLEU during training (speed); full eval in save_results.py
+  early_stopping_patience: 8   # stop if BLEU doesn't improve for 8 evaluations (16 epochs)
+  checkpoint_dir: "checkpoints/how2sign"
+  log_dir: "logs/how2sign"
